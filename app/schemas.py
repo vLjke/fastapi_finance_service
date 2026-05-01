@@ -54,3 +54,65 @@ class WalletOut(WalletBase):
 
     id: int
     owner_id: int
+
+
+class TransactionBase(BaseModel):
+    """Base transaction fields."""
+
+    amount: float = Field(gt=0)
+    type: str = Field(pattern="^(income|expense)$")
+    category: str = Field(min_length=2, max_length=100)
+    note: Optional[str] = Field(default=None, max_length=300)
+    month: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    is_planned: bool = False
+    wallet_id: int
+
+
+class TransactionCreate(TransactionBase):
+    """Transaction creation payload."""
+
+
+class TransactionUpdate(BaseModel):
+    """Partial transaction update payload."""
+
+    amount: Optional[float] = Field(default=None, gt=0)
+    type: Optional[str] = Field(default=None, pattern="^(income|expense)$")
+    category: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    note: Optional[str] = Field(default=None, max_length=300)
+    month: Optional[str] = Field(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    is_planned: Optional[bool] = None
+    wallet_id: Optional[int] = None
+
+
+class TransactionOut(BaseModel):
+    """Transaction response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    amount: float
+    type: str
+    category: str
+    note: Optional[str]
+    month: str
+    is_planned: bool
+    owner_id: int
+    wallet_id: int
+
+
+class SavingPlanItem(BaseModel):
+    """Single expense candidate for savings reduction."""
+
+    transaction_id: int
+    category: str
+    amount: float
+    score: float
+
+
+class SavingPlanResponse(BaseModel):
+    """Savings plan response payload."""
+
+    month: str
+    saving_target: float
+    total_reducible: float
+    selected_reductions: list[SavingPlanItem]
