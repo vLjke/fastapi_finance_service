@@ -71,3 +71,83 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def read_me(current_user: User = Depends(get_current_user)) -> User:
     """Return profile data for currently authenticated user."""
     return current_user
+
+
+@app.post("/wallets", response_model=WalletOut, status_code=status.HTTP_201_CREATED)
+def create_wallet(
+    payload: WalletCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Wallet:
+    """Create wallet for authenticated user."""
+    wallet = Wallet(name=payload.name, balance=payload.balance, owner_id=current_user.id)
+    db.add(wallet)
+    db.commit()
+    db.refresh(wallet)
+    return wallet
+
+
+@app.get("/wallets", response_model=list[WalletOut])
+def list_wallets(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[Wallet]:
+    """List wallets owned by authenticated user."""
+    return db.query(Wallet).filter(Wallet.owner_id == current_user.id).all()
+
+
+@app.get("/wallets/{wallet_id}", response_model=WalletOut)
+def get_wallet(
+    wallet_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Wallet:
+    """Get one wallet by id for authenticated user."""
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.id == wallet_id, Wallet.owner_id == current_user.id)
+        .first()
+    )
+    if not wallet:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found")
+    return wallet
+
+
+@app.put("/wallets/{wallet_id}", response_model=WalletOut)
+def update_wallet(
+    wallet_id: int,
+    payload: WalletUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Wallet:
+    """Update wallet fields for authenticated user."""
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.id == wallet_id, Wallet.owner_id == current_user.id)
+        .first()
+    )
+    if not wallet:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(wallet, field, value)
+    db.commit()
+    db.refresh(wallet)
+    return wallet
+
+
+@app.delete("/wallets/{wallet_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_wallet(
+    wallet_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """Delete wallet by id for authenticated user."""
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.id == wallet_id, Wallet.owner_id == current_user.id)
+        .first()
+    )
+    if not wallet:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found")
+    db.delete(wallet)
+    db.commit()
