@@ -151,3 +151,146 @@ def delete_wallet(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found")
     db.delete(wallet)
     db.commit()
+
+
+@app.post("/transactions", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)
+def create_transaction(
+    payload: TransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Transaction:
+    """Create transaction and update related wallet balance."""
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.id == payload.wallet_id, Wallet.owner_id == current_user.id)
+        .first()
+    )
+    if not wallet:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found")
+    transaction = Transaction(**payload.model_dump(), owner_id=current_user.id)
+    wallet.balance += payload.amount if payload.type == "income" else -payload.amount
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+    return transaction
+
+
+@app.get("/transactions", response_model=list[TransactionOut])
+def list_transactions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[Transaction]:
+    """List transactions for authenticated user."""
+    return db.query(Transaction).filter(Transaction.owner_id == current_user.id).all()
+
+
+@app.get("/transactions/{transaction_id}", response_model=TransactionOut)
+def get_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Transaction:
+    """Get one transaction by id for authenticated user."""
+    transaction = (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id, Transaction.owner_id == current_user.id)
+        .first()
+    )
+    if not transaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    return transaction
+
+
+@app.put("/transactions/{transaction_id}", response_model=TransactionOut)
+def update_transaction(
+    transaction_id: int,
+    payload: TransactionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Transaction:
+    """Update transaction fields for authenticated user."""
+    transaction = (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id, Transaction.owner_id == current_user.id)
+        .first()
+    )
+    if not transaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    data = payload.model_dump(exclude_unset=True)
+    if "wallet_id" in data:
+        wallet = (
+            db.query(Wallet)
+            .filter(Wallet.id == data["wallet_id"], Wallet.owner_id == current_user.id)
+            .first()
+        )
+        if not wallet:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found")
+    for field, value in data.items():
+        setattr(transaction, field, value)
+    db.commit()
+    db.refresh(transaction)
+    return transaction
+
+
+@app.delete("/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """Delete transaction by id for authenticated user."""
+    transaction = (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id, Transaction.owner_id == current_user.id)
+        .first()
+    )
+    if not transaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    db.delete(transaction)
+    db.commit()
+
+
+@app.get("/finance/savings-plan", response_model=SavingPlanResponse)
+def build_savings_plan(
+    month: str,
+    saving_target: float,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SavingPlanResponse:
+    """Suggest biggest expenses to cut until reaching savings target."""
+    if saving_target <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="saving_target must be positive",
+        )
+    expenses = (
+        db.query(Transaction)
+        .filter(
+            Transaction.owner_id == current_user.id,
+            Transaction.month == month,
+            Transaction.type == "expense",
+            Transaction.is_planned.is_(False),
+        )
+        .order_by(Transaction.amount.desc())
+        .all()
+    )
+    total = 0.0
+    selected: list[SavingPlanItem] = []
+    for tx in expenses:
+        if total >= saving_target:
+            break
+        selected.append(
+            SavingPlanItem(
+                transaction_id=tx.id,
+                category=tx.category,
+                amount=tx.amount,
+                score=round(tx.amount, 2),
+            )
+        )
+        total += tx.amount
+    return SavingPlanResponse(
+        month=month,
+        saving_target=saving_target,
+        total_reducible=round(total, 2),
+        selected_reductions=selected,
+    )
