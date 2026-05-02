@@ -1,0 +1,22 @@
+﻿************* Module app.database
+app\database.py:13:0: C0116: Missing function or method docstring (missing-function-docstring)
+************* Module app.models
+app\models.py:9:0: R0903: Too few public methods (0/2) (too-few-public-methods)
+app\models.py:23:0: R0903: Too few public methods (0/2) (too-few-public-methods)
+app\models.py:41:0: R0903: Too few public methods (0/2) (too-few-public-methods)
+************* Module test_app
+tests\test_app.py:52:0: C0301: Line too long (103/100) (line-too-long)
+tests\test_app.py:95:0: C0301: Line too long (123/100) (line-too-long)
+tests\test_app.py:96:0: C0301: Line too long (123/100) (line-too-long)
+tests\test_app.py:97:0: C0301: Line too long (124/100) (line-too-long)
+tests\test_app.py:1:0: C0114: Missing module docstring (missing-module-docstring)
+tests\test_app.py:15:0: C0103: Constant name "TestingSessionLocal" doesn't conform to UPPER_CASE naming style (invalid-name)
+tests\test_app.py:20:0: C0116: Missing function or method docstring (missing-function-docstring)
+tests\test_app.py:32:0: C0116: Missing function or method docstring (missing-function-docstring)
+tests\test_app.py:39:0: C0116: Missing function or method docstring (missing-function-docstring)
+tests\test_app.py:49:0: C0116: Missing function or method docstring (missing-function-docstring)
+tests\test_app.py:88:0: C0116: Missing function or method docstring (missing-function-docstring)
+
+------------------------------------------------------------------
+Your code has been rated at 9.48/10 (previous run: 9.48/10, +0.00)
+
